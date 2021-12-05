@@ -69,6 +69,8 @@ func (index Index) VerifyKeys() {
 	}
 }
 
+
+
 type Entry struct {
 	Key      string   `json:"key"`
 	Title    string   `json:"title"`
@@ -92,13 +94,15 @@ func GenerateEntry(key string) (Entry, error) {
 	return entry, nil
 }
 
+
+
 type Source struct {
 	Title string `json:"title"`
 	Path  string `json:"source"`
 }
 
 func (e *Entry) GenerateSource(file string) {
-	if file[len(file)-4:] != ".mp4" || file[len(file)-5:] != ".webm" {
+	if file[len(file)-4:] != ".mp4" && file[len(file)-5:] != ".webm" {
 		return
 	}
 	source := Source{file[:len(file)-4], "./content/" + e.Key + "/" + file}

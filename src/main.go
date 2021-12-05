@@ -10,10 +10,5 @@ func main() {
 	if err != nil {
 		fmt.Println(err)
 	}
-	fmt.Println("Start of saving.")
-	err = index.Save()
-	if err != nil {
-		fmt.Println(err)
-	}
-	fmt.Println("Done")
+	index.TUI()
 }
