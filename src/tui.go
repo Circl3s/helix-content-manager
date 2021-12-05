@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"sort"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -10,11 +11,26 @@ import (
 	"github.com/charmbracelet/bubbles/key"
 )
 
+type byName []Entry
+
+func (s byName) Len() int {
+	return len(s)
+}
+
+func (s byName) Swap(i, j int) {
+	s[i], s[j] = s[j], s[i]
+}
+
+func (s byName) Less(i, j int) bool {
+	return (s[i].Title[0] < s[j].Title[0])
+}
+
 var fg_primary 		= lipgloss.Color("#db2b39")
-var fg_secondary 	= lipgloss.Color("#2e324e")
+var fg_secondary 	= lipgloss.Color("#777777") // #2e324e
 var bg_primary 		= lipgloss.Color("#0f111a")
 
 var container_style = lipgloss.NewStyle().
+	Margin(1).
 	Padding(1).
 	BorderStyle(lipgloss.RoundedBorder()).
 	BorderForeground(fg_primary)
@@ -33,6 +49,7 @@ var entry_selected_title_style = entry_title_style.Copy().
 	Foreground(fg_primary)
 
 type Model struct {
+	Index		*Index
 	Items 		[]Entry
 	Selected 	int
 	Active		Entry
@@ -90,8 +107,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	case tea.WindowSizeMsg:
 		container_style.
-			Width(msg.Width - 2).
-			Height(msg.Height - 2)
+			Width(msg.Width - 4).
+			Height(msg.Height - 4)
 	}
 
 	var cmd tea.Cmd
@@ -118,12 +135,21 @@ func (m Model) View() string {
 	return container_style.Render(s)
 }
 
-func (index Index) TUI() {
+func NewModel(index *Index) Model {
+	var items []Entry
+	for _, v := range index.Entries {
+		items = append(items, v)
+	}
+	sort.Sort(byName(items))
+	return Model{Index: index, Items: items, Selected: 0, Active: Entry{}}
+}
+
+func (index *Index) TUI() {
 	var entries []Entry
 	for _, v := range index.Entries {
 		entries = append(entries, v)
 	}
-	m := Model{Items: entries[0:4], Selected: 0, Active: Entry{}}
+	m := NewModel(index)
 	
 	p := tea.NewProgram(m)
 	p.EnterAltScreen()
