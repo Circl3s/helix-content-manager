@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"sort"
+	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -32,8 +33,7 @@ var bg_primary 		= lipgloss.Color("#0f111a")
 var container_style = lipgloss.NewStyle().
 	Margin(1).
 	Padding(1).
-	BorderStyle(lipgloss.RoundedBorder()).
-	BorderForeground(fg_primary)
+	BorderStyle(lipgloss.RoundedBorder())
 
 
 var entry_style = lipgloss.NewStyle().
@@ -48,11 +48,18 @@ var entry_key_style = lipgloss.NewStyle().
 var entry_selected_title_style = entry_title_style.Copy().
 	Foreground(fg_primary)
 
+var active_border = lipgloss.NewStyle().
+	BorderForeground(fg_primary)
+
+var inactive_border = lipgloss.NewStyle().
+	BorderForeground(fg_secondary)
+
 type Model struct {
 	Index		*Index
 	Items 		[]Entry
 	Selected 	int
 	Active		Entry
+	Editing		bool
 }
 
 type KeyMap struct {
@@ -73,11 +80,11 @@ var DefaultKeyMap = KeyMap{
 		key.WithHelp("↓", "move down"),
 	),
 	Enter: key.NewBinding(
-		key.WithKeys("return"),
+		key.WithKeys("enter"),
 		key.WithHelp("enter", "confirm"),
 	),
 	Back: key.NewBinding(
-		key.WithKeys("backspace", "escape"),
+		key.WithKeys("backspace", "esc"),
 		key.WithHelp("backspace/esc", "go back"),
 	),
 	Quit: key.NewBinding(
@@ -93,21 +100,33 @@ func (m Model) Init() tea.Cmd {
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		switch {
-		case key.Matches(msg, DefaultKeyMap.Quit):
-			return m, tea.Quit
-		case key.Matches(msg, DefaultKeyMap.Up):
-			if (m.Selected != 0) {
-				m.Selected -= 1
+		if (!m.Editing) {
+			switch {
+			case key.Matches(msg, DefaultKeyMap.Quit):
+				return m, tea.Quit
+			case key.Matches(msg, DefaultKeyMap.Up):
+				if (m.Selected != 0) {
+					m.Selected -= 1
+				}
+			case key.Matches(msg, DefaultKeyMap.Down):
+				if (m.Selected != len(m.Items) - 1) {
+					m.Selected += 1
+				}
+			case key.Matches(msg, DefaultKeyMap.Enter):
+				if (!m.Editing) {
+					m.Editing = true
+				}
 			}
-		case key.Matches(msg, DefaultKeyMap.Down):
-			if (m.Selected != len(m.Items) - 1) {
-				m.Selected += 1
+		} else {
+			switch {
+			case key.Matches(msg, DefaultKeyMap.Back):
+				m.Editing = false
 			}
 		}
+		
 	case tea.WindowSizeMsg:
 		container_style.
-			Width(msg.Width - 4).
+			Width((msg.Width / 2) - 4).
 			Height(msg.Height - 4)
 	}
 
@@ -118,6 +137,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m Model) View() string {
 	var s string
+	var r string
 	var title string
 	for i, e := range m.Items {
 		if i == m.Selected {
@@ -132,7 +152,18 @@ func (m Model) View() string {
 
 		
 	}
-	return container_style.Render(s)
+
+	selected_entry := m.Index.Entries[m.Items[m.Selected].Key]
+	r = selected_entry.Title + "\n" + selected_entry.Key + "\n" + strings.Join(selected_entry.Tags, ", ")
+	var l_style, r_style lipgloss.Style
+	if (m.Editing) {
+		l_style = container_style.Copy().Inherit(inactive_border)
+		r_style = container_style.Copy().Inherit(active_border)
+	} else {
+		l_style = container_style.Copy().Inherit(active_border)
+		r_style = container_style.Copy().Inherit(inactive_border)
+	}
+	return lipgloss.JoinHorizontal(lipgloss.Top, l_style.Render(s), r_style.Render(r))
 }
 
 func NewModel(index *Index) Model {
@@ -141,7 +172,7 @@ func NewModel(index *Index) Model {
 		items = append(items, v)
 	}
 	sort.Sort(byName(items))
-	return Model{Index: index, Items: items, Selected: 0, Active: Entry{}}
+	return Model{Index: index, Items: items, Selected: 0, Active: Entry{}, Editing: false}
 }
 
 func (index *Index) TUI() {
@@ -151,7 +182,7 @@ func (index *Index) TUI() {
 	}
 	m := NewModel(index)
 	
-	p := tea.NewProgram(m)
+	p := tea.NewProgram(m, tea.WithMouseCellMotion())
 	p.EnterAltScreen()
 
 	err := p.Start()
